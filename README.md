@@ -1,84 +1,159 @@
 # job-application-ai-assistant
 
-AI 半自动求职助手 MVP v1。
+一个面向实习投递场景的 AI 半自动求职助手，用于帮助用户分析岗位 JD 与个人简历 profile 的匹配程度，识别技能缺口，生成投递沟通建议，并管理投递记录。
 
-用户自己登录招聘平台并打开岗位详情页，Tampermonkey 脚本读取当前页面可见岗位信息，发送到本地 Go 后端。后端结合 SQLite 中的个人 profile 调用 OpenAI-compatible API，输出结构化岗位匹配分析，保存投递记录，并基于固定关键词词典统计 JD 中常见技术要求。第一版不自动登录、不自动批量爬取、不自动投递。
+项目基于 Go + Next.js + SQLite + Tampermonkey + OpenAI-compatible API 实现。用户仍然自己登录招聘平台、自己浏览岗位、自己决定是否投递；工具只负责“读取当前岗位页可见文本 + 本地分析 + 记录管理”，不做自动投递。
 
-## 技术栈
+## 项目简介
 
-- Backend: Go `net/http`
-- Database: SQLite
-- Frontend: Next.js
-- Browser script: Tampermonkey
-- AI: OpenAI-compatible API
+在 BOSS 直聘岗位详情页中，Tampermonkey 脚本读取当前页面可见的岗位信息和 JD 文本，发送到本地 Go 后端。后端读取 SQLite 中维护的个人 profile，调用 OpenAI-compatible API 进行结构化匹配分析，并将分析结果保存为投递记录。
 
-## 功能范围
+系统会输出：
 
-已完成：
+- 岗位匹配分
+- 风险等级
+- 匹配点
+- 技能缺口
+- 简历优化建议
+- 投递沟通语
+- JD 技术关键词统计
+- 投递状态记录
 
-- `GET /api/health`
-- `GET /api/resume-profile`
-- `PUT /api/resume-profile`
-- `POST /api/analyze-job`
-- `GET /api/applications`
-- `GET /api/applications/{id}`
-- `PATCH /api/applications/{id}/status`
-- `GET /api/keyword-stats`
-- `GET /api/applications/{id}/keywords`
-- `/profile` profile 管理页
-- `/applications` 投递记录管理页
-- `/keywords` 岗位关键词统计页
-- BOSS 直聘页面 Tampermonkey 分析浮层
+## 项目背景
+
+实习投递时，岗位 JD 数量多、信息密度高，手动判断岗位是否适合自己很耗时。这个项目的目标不是替用户“自动投递”，而是帮助用户更快回答几个问题：
+
+- 这个岗位和我的当前技能栈匹配吗？
+- JD 中反复出现哪些技术关键词？
+- 我的简历应该突出哪些项目经历？
+- 投递前的沟通语可以怎么写？
+- 投递后的状态如何记录和跟踪？
+
+## 安全边界
+
+这个项目不是爬虫，也不是自动投递工具。
 
 明确不做：
 
-- 自动登录招聘平台
-- 自动批量爬取岗位
-- 自动投递
-- 自动填写聊天框
-- 自动点击立即沟通、投递或发送按钮
-- Selenium
+- 不自动登录招聘平台
+- 不批量爬取岗位
+- 不自动投递
+- 不自动填写聊天框
+- 不点击“立即沟通”“投递”“发送”等按钮
+- 不使用 Selenium
+- 不绕过平台权限或风控
 
-## Step 6：岗位关键词统计
+API Key 只允许放在 Go 后端环境变量中：
 
-关键词统计用于查看已分析 JD 中高频出现的技术要求，辅助判断当前实习岗位市场更常要求哪些技能，从而调整学习优先级和投递方向。
+- 不写入前端代码
+- 不写入 Tampermonkey 脚本
+- 不写入数据库
+- 不提交真实 `.env`
 
-第一版不使用 LLM 提取关键词，而是使用固定关键词词典 + 文本匹配 + 归一化，保证统计结果稳定、可解释。
+## 核心功能
 
-词典分类包括：
+### 个人 profile 管理
 
-- `language`
-- `backend`
-- `database`
-- `cache`
-- `middleware`
-- `devops`
-- `network`
-- `fundamentals`
-- `concurrency`
-- `system`
-- `ai`
+通过 Next.js `/profile` 页面维护个人信息：
 
-## 环境变量
+- 姓名
+- 目标岗位
+- 技能列表
+- 项目经历
+- 个人简介
 
-后端读取这些环境变量：
+这些信息会保存到 SQLite，并作为岗位分析时的候选人上下文。
+
+### 岗位匹配分析
+
+Tampermonkey 脚本在 BOSS 直聘岗位详情页提供右侧浮层。点击“分析当前岗位”后：
+
+1. 读取当前页面可见岗位信息；
+2. 提取公司、岗位、JD 文本；
+3. 调用本地 Go 后端 `/api/analyze-job`；
+4. 后端结合个人 profile 调用 LLM；
+5. 返回结构化 JSON；
+6. 在当前页面展示分析结果。
+
+### 投递记录管理
+
+通过 `/applications` 页面查看历史岗位分析记录：
+
+- 公司
+- 岗位
+- 匹配分
+- 风险等级
+- 投递状态
+- 匹配点
+- 缺失点
+- 简历优化建议
+- 沟通语
+- 原始 JD 文本
+
+支持修改投递状态：
+
+- 待投递
+- 已投递
+- 已沟通
+- 面试
+- 拒绝
+
+### 岗位技术关键词统计
+
+通过 `/keywords` 页面查看已分析 JD 中出现的高频技术关键词。
+
+关键词统计不使用 LLM，而是使用固定词典 + 文本匹配 + 归一化，保证结果稳定、可解释。它用于辅助判断当前实习岗位市场中更常见的技能要求，例如 Go、Redis、MySQL、Docker、Kubernetes、微服务、分布式等。
+
+## 技术栈
+
+| 模块 | 技术 |
+| --- | --- |
+| 后端 | Go `net/http` |
+| 数据库 | SQLite |
+| 前端 | Next.js |
+| 页面脚本 | Tampermonkey |
+| AI 能力 | OpenAI-compatible API |
+| 数据格式 | JSON |
+
+## 架构说明
 
 ```text
-AI_API_KEY=your_api_key_here
-AI_BASE_URL=https://api.openai.com/v1
-AI_MODEL=gpt-4.1-mini
-PORT=8083
+BOSS 岗位详情页
+  ↓
+Tampermonkey 脚本读取当前页面可见文本
+  ↓
+POST http://localhost:8083/api/analyze-job
+  ↓
+Go net/http 后端
+  ↓
+读取 SQLite 中的 resume profile
+  ↓
+组装 prompt 并调用 OpenAI-compatible API
+  ↓
+解析结构化 JSON
+  ↓
+保存 job_applications 和 job_keywords
+  ↓
+返回分析结果给脚本和前端页面
 ```
 
-说明：
+前端 Next.js 主要用于管理页面：
 
-- `AI_API_KEY` 必填，只能放在后端环境变量中。
-- `AI_BASE_URL` 为空时默认 `https://api.openai.com/v1`。
-- `AI_MODEL` 为空时默认 `gpt-4.1-mini`。
-- `PORT` 为空时默认 `8083`。
-- 根目录 `.env.example` 只提供占位示例，不要提交真实 `.env`。
+- `/profile`：个人 profile 管理
+- `/applications`：投递记录管理
+- `/keywords`：岗位关键词统计
 
-## 启动后端
+前端通过 Next.js rewrite 将 `/api/*` 转发到本地 Go 后端：
+
+```text
+http://localhost:8083/api/*
+```
+
+## 本地启动
+
+### 1. 启动后端
+
+PowerShell 示例：
 
 ```powershell
 cd backend
@@ -91,7 +166,7 @@ $env:AI_MODEL = "gpt-4.1-mini"
 go run .
 ```
 
-默认地址：
+默认后端地址：
 
 ```text
 http://localhost:8083
@@ -103,7 +178,9 @@ SQLite 默认数据库文件：
 backend/data/app.db
 ```
 
-## 启动前端
+### 2. 启动前端
+
+PowerShell 示例：
 
 ```powershell
 cd frontend
@@ -111,19 +188,23 @@ npm install
 npm run dev
 ```
 
-默认地址：
+默认前端地址：
 
 ```text
 http://localhost:3000
 ```
 
-前端通过 Next.js rewrite 把 `/api/*` 转发到：
+### 3. 初始化个人 profile
+
+打开：
 
 ```text
-http://localhost:8083/api/*
+http://localhost:3000/profile
 ```
 
-## 安装 Tampermonkey 脚本
+填写个人技能、项目和求职方向后保存。
+
+## Tampermonkey 脚本使用方式
 
 脚本文件：
 
@@ -133,110 +214,66 @@ scripts/boss-job-analyzer.user.js
 
 安装步骤：
 
-1. 浏览器安装 Tampermonkey 扩展。
-2. 打开 Tampermonkey 管理面板。
-3. 新建脚本。
-4. 删除默认内容。
-5. 复制 `scripts/boss-job-analyzer.user.js` 的完整内容并粘贴保存。
+1. 浏览器安装 Tampermonkey 扩展；
+2. 打开 Tampermonkey 管理面板；
+3. 新建脚本；
+4. 删除默认内容；
+5. 复制 `scripts/boss-job-analyzer.user.js` 的完整内容并保存；
+6. 确认本地 Go 后端正在运行；
+7. 用户自己登录 BOSS 直聘；
+8. 打开岗位详情页；
+9. 点击页面右侧浮层中的“分析当前岗位”。
 
-更新脚本时，重新复制该文件内容覆盖 Tampermonkey 中的旧脚本即可。
-
-脚本只访问本地后端：
+脚本会把当前岗位页信息发送到：
 
 ```text
 http://localhost:8083/api/analyze-job
 ```
 
-脚本中不包含 `AI_API_KEY`。
+脚本只读取当前页面可见文本，不会自动打开新岗位，不会自动填写输入框，不会点击投递或发送按钮。
 
-## 验证流程
+## 环境变量
 
-### 1. 更新 profile
-
-打开：
+后端支持以下环境变量：
 
 ```text
-http://localhost:3000/profile
+AI_API_KEY=your_api_key_here
+AI_BASE_URL=https://api.openai.com/v1
+AI_MODEL=gpt-4.1-mini
+PORT=8083
 ```
 
-填写姓名、目标岗位、技能、项目和简介，点击保存。技能和项目是一行一个条目。
+说明：
 
-### 2. 在 BOSS 页面分析岗位
+- `AI_API_KEY`：必填，只能放在后端环境变量中；
+- `AI_BASE_URL`：可选，默认 `https://api.openai.com/v1`；
+- `AI_MODEL`：可选，默认 `gpt-4.1-mini`；
+- `PORT`：可选，默认 `8083`。
 
-1. 保持本地 Go 后端运行。
-2. 用户自己登录 BOSS 直聘。
-3. 打开一个岗位详情页。
-4. 页面右侧出现「AI 岗位分析」浮层。
-5. 点击「分析当前岗位」。
-6. 等待状态变为「分析完成」。
+根目录提供 `.env.example` 作为占位示例，但当前 Go 后端不会自动加载 `.env`。真实 `.env` 不应提交到仓库。
 
-浮层会展示公司、岗位、匹配分、风险等级、匹配点、缺失点、简历优化建议、技术关键词和沟通语。
+## API 简要说明
 
-### 3. 查看投递记录
+### Health
 
-打开：
-
-```text
-http://localhost:3000/applications
+```http
+GET /api/health
 ```
 
-页面会展示历史分析记录列表。点击某条记录后，可以查看匹配点、缺失点、简历优化建议、技术关键词、沟通语和 JD 文本。
+### Resume Profile
 
-接口验证：
-
-```powershell
-Invoke-RestMethod -Uri "http://localhost:8083/api/applications?limit=20&offset=0"
-Invoke-RestMethod -Uri "http://localhost:8083/api/applications/1"
-Invoke-RestMethod -Uri "http://localhost:8083/api/applications/1/keywords"
+```http
+GET /api/resume-profile
+PUT /api/resume-profile
 ```
 
-### 4. 修改投递状态
+### Analyze Job
 
-在 `/applications` 页面详情区域选择状态即可。
-
-状态只允许：
-
-- 待投递
-- 已投递
-- 已沟通
-- 面试
-- 拒绝
-
-PowerShell 验证：
-
-```powershell
-$body = @{ status = "已投递" } | ConvertTo-Json
-$bytes = [System.Text.Encoding]::UTF8.GetBytes($body)
-
-Invoke-RestMethod `
-  -Uri "http://localhost:8083/api/applications/1/status" `
-  -Method PATCH `
-  -ContentType "application/json; charset=utf-8" `
-  -Body $bytes
+```http
+POST /api/analyze-job
 ```
 
-### 5. 查看关键词统计
-
-打开：
-
-```text
-http://localhost:3000/keywords
-```
-
-页面会展示关键词、分类和出现次数，并支持按分类筛选。
-
-接口验证：
-
-```powershell
-Invoke-RestMethod -Uri "http://localhost:8083/api/keyword-stats"
-Invoke-RestMethod -Uri "http://localhost:8083/api/keyword-stats?category=cache&limit=20"
-```
-
-## API 说明
-
-### POST /api/analyze-job
-
-请求：
+请求示例：
 
 ```json
 {
@@ -246,7 +283,7 @@ Invoke-RestMethod -Uri "http://localhost:8083/api/keyword-stats?category=cache&l
 }
 ```
 
-返回中包含 `keywords`：
+返回中包含匹配分析结果和关键词：
 
 ```json
 {
@@ -255,10 +292,10 @@ Invoke-RestMethod -Uri "http://localhost:8083/api/keyword-stats?category=cache&l
   "position": "Go 后端开发实习",
   "match_score": 85,
   "risk_level": "low",
-  "matched_points": [],
-  "missing_points": [],
-  "resume_suggestions": [],
-  "message_draft": "...",
+  "matched_points": ["Go", "REST API"],
+  "missing_points": ["Kafka"],
+  "resume_suggestions": ["强化项目中的 Redis 缓存描述"],
+  "message_draft": "您好，我想投递...",
   "status": "待投递",
   "keywords": [
     { "keyword": "Go", "category": "language" },
@@ -269,14 +306,31 @@ Invoke-RestMethod -Uri "http://localhost:8083/api/keyword-stats?category=cache&l
 }
 ```
 
-### GET /api/keyword-stats
+### Applications
 
-支持查询参数：
+```http
+GET /api/applications?limit=20&offset=0
+GET /api/applications/{id}
+PATCH /api/applications/{id}/status
+GET /api/applications/{id}/keywords
+```
 
-- `limit`：默认 50，最大 100
-- `category`：可选，按分类过滤
+修改状态请求示例：
 
-返回：
+```json
+{
+  "status": "已投递"
+}
+```
+
+### Keyword Stats
+
+```http
+GET /api/keyword-stats
+GET /api/keyword-stats?category=cache&limit=20
+```
+
+返回示例：
 
 ```json
 {
@@ -291,34 +345,33 @@ Invoke-RestMethod -Uri "http://localhost:8083/api/keyword-stats?category=cache&l
 }
 ```
 
-## 安全边界
+## 项目亮点
 
-- API Key 只放在 Go 后端环境变量。
-- 不提交真实 `.env`。
-- Tampermonkey 脚本不包含 API Key。
-- 用户自己登录招聘平台。
-- 脚本只读取当前页面可见文本。
-- 不自动登录。
-- 不自动投递。
-- 不自动填写聊天框。
-- 不自动点击立即沟通、投递或发送按钮。
-- 不批量爬取。
+- 使用 Go `net/http` 实现清晰的后端 API，覆盖 profile、岗位分析、投递记录、状态修改和关键词统计。
+- 使用 SQLite 进行轻量持久化，适合本地个人工具场景。
+- 将 AI 调用集中在后端，避免 API Key 暴露到前端或脚本。
+- 要求 LLM 返回结构化 JSON，后端解析后再保存，降低自由文本不可控的问题。
+- Tampermonkey 脚本只作为“当前页面入口”，不扩展为批量爬虫或自动化投递工具。
+- 岗位关键词统计使用固定词典而非 LLM，结果更稳定、可解释。
+- 前端提供 profile、投递记录和关键词统计三个管理页面，便于完整展示项目闭环。
 
-## 简历描述草稿
+## 简历可用描述
 
-一句话项目描述：
+基于 Go + Next.js + SQLite + Tampermonkey + OpenAI-compatible API 实现 AI 半自动求职助手，支持从 BOSS 岗位详情页读取当前 JD，结合个人 profile 调用大模型进行结构化匹配分析，输出匹配分、风险等级、技能缺口、简历优化建议和投递沟通语，并支持投递记录管理、状态跟踪和岗位技术关键词统计。
 
-基于 Go + Next.js + SQLite + Tampermonkey + OpenAI-compatible API 实现 AI 半自动求职助手，支持从 BOSS 岗位页面提取 JD，结合个人 profile 调用大模型进行结构化匹配分析，并管理投递记录、状态和岗位技术关键词统计。
+可展开描述：
 
-技术栈：
+- 使用 Go `net/http` 设计 REST API，完成岗位分析、profile 管理、投递记录查询和状态更新；
+- 使用 SQLite 持久化个人 profile、AI 分析结果、投递状态和关键词统计数据；
+- 接入 OpenAI-compatible API，并通过 prompt 约束模型输出结构化 JSON；
+- 编写 Tampermonkey 脚本读取当前岗位页可见文本，在页面浮层展示分析结果；
+- 使用固定关键词词典对 JD 做稳定匹配与归一化，用于统计岗位技能需求；
+- 明确安全边界，不自动登录、不自动投递、不批量爬取。
 
-Go `net/http`、SQLite、Next.js、Tampermonkey、OpenAI-compatible API。
+## 后续计划
 
-核心亮点：
-
-- 设计 Go 后端 API，完成 profile 管理、岗位分析、投递记录查询、状态流转和关键词统计。
-- 使用 SQLite 持久化个人 profile、AI 分析结果、沟通语、投递状态和岗位关键词。
-- 接入 OpenAI-compatible API，约束模型输出合法 JSON，解析匹配分、风险等级、技能缺口、简历优化建议和沟通语。
-- 编写 Tampermonkey 脚本读取当前 BOSS 岗位页可见文本，通过本地后端完成分析并在页面浮层展示结果。
-- 使用固定关键词词典对 JD 做稳定匹配与归一化，不依赖 LLM 提取关键词，便于统计实习岗位技能需求。
-- 明确安全边界：不保存 API Key、不自动登录、不自动投递、不批量爬取。
+- 继续优化岗位页面字段提取准确率；
+- 增加更多可配置的关键词词典；
+- 为关键词统计增加导出能力；
+- 增加投递记录搜索和筛选；
+- 增加更完善的错误提示和本地配置说明。
