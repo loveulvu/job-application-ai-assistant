@@ -1,24 +1,40 @@
 # job-application-ai-assistant
 
-半自动简历投递辅助器 MVP v1.0。
+AI 半自动求职助手 MVP v1。
 
-当前方向：用户自己登录招聘平台并打开岗位详情页，由 Tampermonkey 脚本读取当前页面可见岗位信息，发送到本地 Go 后端分析。第一版只做 AI 分析、结果展示、投递记录和沟通语复制，不做自动登录、自动批量爬取、自动投递、Selenium 或浏览器插件。
+用户自己登录招聘平台并打开岗位详情页，Tampermonkey 脚本读取当前页面可见岗位信息，发送到本地 Go 后端。后端结合 SQLite 中的个人 profile 调用 OpenAI-compatible API，输出结构化岗位匹配分析，并保存投递记录。第一版不自动登录、不自动批量爬取、不自动投递。
 
 ## 技术栈
 
-- Frontend: Next.js
 - Backend: Go `net/http`
 - Database: SQLite
+- Frontend: Next.js
+- Browser script: Tampermonkey
 - AI: OpenAI-compatible API
-- Browser script: Tampermonkey userscript
 
-## 五步计划
+## 功能范围
 
-1. 项目骨架和 `/api/health`，已完成。
-2. SQLite + resume profile `GET / PUT`，已完成。
-3. `/api/analyze-job` + LLM 调用 + `job_applications` 落库，已完成。
-4. Tampermonkey 脚本读取当前岗位页文本，并调用本地 Go 后端分析。
-5. 投递记录管理、状态修改、README、简历描述。
+已完成：
+
+- `GET /api/health`
+- `GET /api/resume-profile`
+- `PUT /api/resume-profile`
+- `POST /api/analyze-job`
+- `GET /api/applications`
+- `GET /api/applications/{id}`
+- `PATCH /api/applications/{id}/status`
+- `/profile` profile 管理页
+- `/applications` 投递记录管理页
+- BOSS 直聘页面 Tampermonkey 分析浮层
+
+明确不做：
+
+- 自动登录招聘平台
+- 自动批量爬取岗位
+- 自动投递
+- 自动填写聊天框
+- 自动点击立即沟通、投递或发送按钮
+- Selenium
 
 ## 环境变量
 
@@ -33,26 +49,13 @@ PORT=8083
 
 说明：
 
-- `AI_API_KEY` 必填，不能写进代码、前端文件、Tampermonkey 脚本或数据库。
+- `AI_API_KEY` 必填，只能放在后端环境变量中。
 - `AI_BASE_URL` 为空时默认 `https://api.openai.com/v1`。
 - `AI_MODEL` 为空时默认 `gpt-4.1-mini`。
 - `PORT` 为空时默认 `8083`。
+- 根目录 `.env.example` 只提供占位示例，不要提交真实 `.env`。
 
-也可以参考根目录的 `.env.example`，但当前 Go 后端不会自动加载 `.env` 文件，需要在终端里设置环境变量。
-
-## 本地运行
-
-前端：
-
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-默认地址：http://localhost:3000
-
-后端：
+## 启动后端
 
 ```powershell
 cd backend
@@ -65,31 +68,77 @@ $env:AI_MODEL = "gpt-4.1-mini"
 go run .
 ```
 
-默认地址：http://localhost:8083
-
-SQLite 默认数据库文件：`backend/data/app.db`。
-
-## UTF-8 说明
-
-后端响应头已设置为：
+默认地址：
 
 ```text
-Content-Type: application/json; charset=utf-8
+http://localhost:8083
 ```
 
-后端使用 Go 标准库 `json.NewDecoder` 读取请求体，不做额外转码；SQLite 的 `TEXT` 字段也直接保存 Go 字符串和 JSON 字符串，不做额外编码转换。
+SQLite 默认数据库文件：
 
-如果在 Windows PowerShell 中用 `curl -d` 直接拼中文 JSON，中文可能在发送前被 PowerShell 编码成 `???`。推荐使用 `ConvertTo-Json` + UTF-8 bytes 写法。
+```text
+backend/data/app.db
+```
 
-## 验证 Step 2
-
-健康检查：
+## 启动前端
 
 ```powershell
-curl.exe http://localhost:8083/api/health
+cd frontend
+npm install
+npm run dev
 ```
 
-用 Windows PowerShell 发送中文 profile：
+默认地址：
+
+```text
+http://localhost:3000
+```
+
+前端通过 Next.js rewrite 把 `/api/*` 转发到：
+
+```text
+http://localhost:8083/api/*
+```
+
+## 安装 Tampermonkey 脚本
+
+脚本文件：
+
+```text
+scripts/boss-job-analyzer.user.js
+```
+
+安装步骤：
+
+1. 浏览器安装 Tampermonkey 扩展。
+2. 打开 Tampermonkey 管理面板。
+3. 新建脚本。
+4. 删除默认内容。
+5. 复制 `scripts/boss-job-analyzer.user.js` 的完整内容并粘贴保存。
+
+更新脚本时，重新复制该文件内容覆盖 Tampermonkey 中的旧脚本即可。
+
+脚本只访问本地后端：
+
+```text
+http://localhost:8083/api/analyze-job
+```
+
+脚本中不包含 `AI_API_KEY`。
+
+## 验证流程
+
+### 1. 更新 profile
+
+打开：
+
+```text
+http://localhost:3000/profile
+```
+
+填写姓名、目标岗位、技能、项目和简介，点击保存。技能和项目是一行一个条目。
+
+也可以用 PowerShell 验证：
 
 ```powershell
 $body = @{
@@ -112,88 +161,175 @@ Invoke-RestMethod `
   -Body $bytes
 ```
 
-再次读取，确认中文没有变成 `???`：
+### 2. 在 BOSS 页面分析岗位
 
-```powershell
-Invoke-RestMethod -Uri "http://localhost:8083/api/resume-profile"
+1. 保持本地 Go 后端运行。
+2. 用户自己登录 BOSS 直聘。
+3. 打开一个岗位详情页。
+4. 页面右侧出现「AI 岗位分析」浮层。
+5. 点击「分析当前岗位」。
+6. 等待状态变为「分析完成」。
+
+浮层会展示：
+
+- 公司
+- 岗位
+- 匹配分
+- 风险等级
+- 匹配点
+- 缺失点
+- 简历优化建议
+- 沟通语
+
+点击「复制沟通语」会把沟通语复制到剪贴板。脚本不会自动填写输入框，也不会点击投递或发送按钮。
+
+### 3. 查看投递记录
+
+打开：
+
+```text
+http://localhost:3000/applications
 ```
 
-## 验证 Step 3
+页面会展示历史分析记录列表。点击某条记录后，可以查看匹配点、缺失点、简历优化建议、沟通语和 JD 文本。
 
-先确认已经设置 `AI_API_KEY`，并且 profile 不是空的。
+也可以用接口验证：
 
 ```powershell
-$env:AI_API_KEY = "your_api_key_here"
-$env:AI_BASE_URL = "https://api.openai.com/v1"
-$env:AI_MODEL = "gpt-4.1-mini"
-go run .
+Invoke-RestMethod -Uri "http://localhost:8083/api/applications?limit=20&offset=0"
 ```
 
-另开一个 PowerShell 终端：
+查看单条详情：
 
 ```powershell
-$body = @{
-  company = "某公司"
-  position = "Go 后端开发实习"
-  jd_text = "岗位职责：负责后端接口开发，熟悉 Go、SQLite、Redis，有 REST API 项目经验优先。"
-} | ConvertTo-Json -Depth 5
+Invoke-RestMethod -Uri "http://localhost:8083/api/applications/1"
+```
 
+### 4. 修改投递状态
+
+在 `/applications` 页面详情区域选择状态即可。
+
+状态只允许：
+
+- 待投递
+- 已投递
+- 已沟通
+- 面试
+- 拒绝
+
+PowerShell 验证：
+
+```powershell
+$body = @{ status = "已投递" } | ConvertTo-Json
 $bytes = [System.Text.Encoding]::UTF8.GetBytes($body)
 
 Invoke-RestMethod `
-  -Uri "http://localhost:8083/api/analyze-job" `
-  -Method POST `
+  -Uri "http://localhost:8083/api/applications/1/status" `
+  -Method PATCH `
   -ContentType "application/json; charset=utf-8" `
   -Body $bytes
 ```
 
-确认 `job_applications` 已保存记录：
+确认数据库记录：
 
 ```powershell
 sqlite3 .\data\app.db "select id, company, position, match_score, risk_level, status, created_at from job_applications order by id desc limit 5;"
 ```
 
-## 使用 Step 4 Tampermonkey 脚本
+## API 说明
 
-脚本文件：
+### POST /api/analyze-job
 
-```text
-scripts/boss-job-analyzer.user.js
+请求：
+
+```json
+{
+  "company": "某公司",
+  "position": "Go 后端开发实习",
+  "jd_text": "岗位 JD 文本"
+}
 ```
 
-安装方式：
+返回：
 
-1. 在浏览器安装 Tampermonkey 扩展。
-2. 打开 Tampermonkey 管理面板。
-3. 新建脚本。
-4. 删除默认内容。
-5. 复制 `scripts/boss-job-analyzer.user.js` 的完整内容粘贴进去并保存。
-
-使用前先启动本地 Go 后端：
-
-```powershell
-cd backend
-$env:AI_API_KEY = "your_api_key_here"
-$env:AI_BASE_URL = "https://api.openai.com/v1"
-$env:AI_MODEL = "gpt-4.1-mini"
-go run .
+```json
+{
+  "id": 1,
+  "company": "某公司",
+  "position": "Go 后端开发实习",
+  "jd_text": "岗位 JD 文本",
+  "match_score": 85,
+  "risk_level": "low",
+  "matched_points": [],
+  "missing_points": [],
+  "resume_suggestions": [],
+  "message_draft": "...",
+  "status": "待投递",
+  "created_at": "...",
+  "updated_at": "..."
+}
 ```
 
-然后：
+### GET /api/applications
 
-1. 用户自己登录 BOSS 直聘。
-2. 打开一个岗位详情页。
-3. 页面右侧会出现「AI 岗位分析」浮层。
-4. 点击「分析当前岗位」。
-5. 脚本只读取当前页面可见文本，调用 `http://localhost:8083/api/analyze-job`。
-6. 分析完成后，浮层会展示 `company`、`position`、`match_score`、`risk_level`、`matched_points`、`missing_points`、`resume_suggestions`、`message_draft`。
-7. 点击「复制沟通语」会把 `message_draft` 复制到剪贴板。
+支持查询参数：
 
-限制：
+- `limit`：默认 20，最大 100
+- `offset`：默认 0
 
+返回：
+
+```json
+{
+  "items": [],
+  "count": 0
+}
+```
+
+### PATCH /api/applications/{id}/status
+
+请求：
+
+```json
+{
+  "status": "已投递"
+}
+```
+
+## 安全边界
+
+- API Key 只放在 Go 后端环境变量。
+- 不提交真实 `.env`。
+- Tampermonkey 脚本不包含 API Key。
+- 用户自己登录招聘平台。
+- 脚本只读取当前页面可见文本。
 - 不自动登录。
-- 不自动批量爬取。
-- 不自动打开新岗位。
-- 不自动填写输入框。
-- 不自动点击投递或发送按钮。
-- 不包含 `AI_API_KEY`，密钥只放在本地 Go 后端环境变量里。
+- 不自动投递。
+- 不自动填写聊天框。
+- 不自动点击立即沟通、投递或发送按钮。
+- 不批量爬取。
+
+## 简历描述草稿
+
+一句话项目描述：
+
+基于 Go + Next.js + SQLite + Tampermonkey + OpenAI-compatible API 实现 AI 半自动求职助手，支持从 BOSS 岗位页面提取 JD，结合个人 profile 调用大模型进行结构化匹配分析，并管理投递记录与状态。
+
+技术栈：
+
+Go `net/http`、SQLite、Next.js、Tampermonkey、OpenAI-compatible API。
+
+核心亮点：
+
+- 设计 Go 后端 API，完成 profile 管理、岗位分析、投递记录查询和状态流转。
+- 使用 SQLite 持久化个人 profile、AI 分析结果、沟通语和投递状态。
+- 接入 OpenAI-compatible API，约束模型输出合法 JSON，解析匹配分、风险等级、技能缺口、简历优化建议和沟通语。
+- 编写 Tampermonkey 脚本读取当前 BOSS 岗位页可见文本，通过本地后端完成分析并在页面浮层展示结果。
+- 明确安全边界：不保存 API Key、不自动登录、不自动投递、不批量爬取。
+
+可讲述的实现点：
+
+- 后端统一返回 `application/json; charset=utf-8`，PowerShell 中文请求使用 UTF-8 bytes，避免中文写入变成 `???`。
+- 前端使用 Next.js rewrite 代理 `/api/*` 到本地 Go 后端，减少浏览器跨域问题。
+- 投递状态固定枚举为「待投递、已投递、已沟通、面试、拒绝」，非法状态返回 400。
+- Tampermonkey 脚本只分析当前页面，提取失败时使用 `document.body.innerText` 截断兜底，避免扩大为爬虫。

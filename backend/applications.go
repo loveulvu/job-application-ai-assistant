@@ -1,6 +1,10 @@
 package main
 
-import "encoding/json"
+import (
+	"database/sql"
+	"encoding/json"
+	"errors"
+)
 
 const defaultApplicationStatus = "\u5f85\u6295\u9012"
 
@@ -8,6 +12,7 @@ type jobApplicationResponse struct {
 	ID                int      `json:"id"`
 	Company           string   `json:"company"`
 	Position          string   `json:"position"`
+	JDText            string   `json:"jd_text,omitempty"`
 	MatchScore        int      `json:"match_score"`
 	RiskLevel         string   `json:"risk_level"`
 	MatchedPoints     []string `json:"matched_points"`
@@ -17,6 +22,22 @@ type jobApplicationResponse struct {
 	Status            string   `json:"status"`
 	CreatedAt         string   `json:"created_at"`
 	UpdatedAt         string   `json:"updated_at"`
+}
+
+type jobApplicationListItem struct {
+	ID         int    `json:"id"`
+	Company    string `json:"company"`
+	Position   string `json:"position"`
+	MatchScore int    `json:"match_score"`
+	RiskLevel  string `json:"risk_level"`
+	Status     string `json:"status"`
+	CreatedAt  string `json:"created_at"`
+	UpdatedAt  string `json:"updated_at"`
+}
+
+type jobApplicationListResponse struct {
+	Items []jobApplicationListItem `json:"items"`
+	Count int                      `json:"count"`
 }
 
 func (app *application) createJobApplication(input analyzeJobRequest, analysis aiAnalysisResult) (jobApplicationResponse, error) {
@@ -78,6 +99,7 @@ func (app *application) getJobApplication(id int) (jobApplicationResponse, error
 		id,
 		company,
 		position,
+		jd_text,
 		match_score,
 		risk_level,
 		matched_points,
@@ -99,6 +121,7 @@ func (app *application) getJobApplication(id int) (jobApplicationResponse, error
 		&item.ID,
 		&item.Company,
 		&item.Position,
+		&item.JDText,
 		&item.MatchScore,
 		&item.RiskLevel,
 		&matchedPointsJSON,
@@ -124,4 +147,68 @@ func (app *application) getJobApplication(id int) (jobApplicationResponse, error
 	}
 
 	return item, nil
+}
+
+func (app *application) listJobApplications(limit int, offset int) (jobApplicationListResponse, error) {
+	const query = `SELECT
+		id,
+		company,
+		position,
+		match_score,
+		risk_level,
+		status,
+		created_at,
+		updated_at
+	FROM job_applications
+	ORDER BY id DESC
+	LIMIT ? OFFSET ?`
+
+	rows, err := app.db.Query(query, limit, offset)
+	if err != nil {
+		return jobApplicationListResponse{}, err
+	}
+	defer rows.Close()
+
+	items := make([]jobApplicationListItem, 0)
+	for rows.Next() {
+		var item jobApplicationListItem
+		if err := rows.Scan(
+			&item.ID,
+			&item.Company,
+			&item.Position,
+			&item.MatchScore,
+			&item.RiskLevel,
+			&item.Status,
+			&item.CreatedAt,
+			&item.UpdatedAt,
+		); err != nil {
+			return jobApplicationListResponse{}, err
+		}
+		items = append(items, item)
+	}
+
+	if err := rows.Err(); err != nil {
+		return jobApplicationListResponse{}, err
+	}
+
+	return jobApplicationListResponse{
+		Items: items,
+		Count: len(items),
+	}, nil
+}
+
+func (app *application) updateJobApplicationStatus(id int, status string) (jobApplicationResponse, error) {
+	const statement = `UPDATE job_applications
+	SET status = ?, updated_at = CURRENT_TIMESTAMP
+	WHERE id = ?`
+
+	if _, err := app.db.Exec(statement, status, id); err != nil {
+		return jobApplicationResponse{}, err
+	}
+
+	return app.getJobApplication(id)
+}
+
+func isNotFound(err error) bool {
+	return errors.Is(err, sql.ErrNoRows)
 }

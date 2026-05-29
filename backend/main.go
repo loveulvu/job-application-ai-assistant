@@ -35,6 +35,9 @@ func main() {
 	mux.HandleFunc("GET /api/resume-profile", app.handleGetResumeProfile)
 	mux.HandleFunc("PUT /api/resume-profile", app.handlePutResumeProfile)
 	mux.HandleFunc("POST /api/analyze-job", app.handleAnalyzeJob)
+	mux.HandleFunc("GET /api/applications", app.handleListApplications)
+	mux.HandleFunc("GET /api/applications/{id}", app.handleGetApplication)
+	mux.HandleFunc("PATCH /api/applications/{id}/status", app.handlePatchApplicationStatus)
 
 	port := os.Getenv("PORT")
 	if port == "" {
