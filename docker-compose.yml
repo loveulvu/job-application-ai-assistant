@@ -1,0 +1,33 @@
+services:
+  backend:
+    build:
+      context: ./backend
+    image: job-ai-backend
+    container_name: job-ai-backend
+    ports:
+      - "8083:8083"
+    environment:
+      PORT: "8083"
+      DB_PATH: "/app/data/app.db"
+      AI_API_KEY: "${AI_API_KEY}"
+      AI_BASE_URL: "${AI_BASE_URL}"
+      AI_MODEL: "${AI_MODEL}"
+    volumes:
+      - job_ai_backend_data:/app/data
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        BACKEND_URL: "http://backend:8083"
+    image: job-ai-frontend
+    container_name: job-ai-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      BACKEND_URL: "http://backend:8083"
+    depends_on:
+      - backend
+
+volumes:
+  job_ai_backend_data:
