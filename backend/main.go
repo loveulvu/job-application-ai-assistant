@@ -34,6 +34,7 @@ func main() {
 	mux.HandleFunc("GET /api/health", handleHealth)
 	mux.HandleFunc("GET /api/resume-profile", app.handleGetResumeProfile)
 	mux.HandleFunc("PUT /api/resume-profile", app.handlePutResumeProfile)
+	mux.HandleFunc("POST /api/analyze-job", app.handleAnalyzeJob)
 
 	port := os.Getenv("PORT")
 	if port == "" {
