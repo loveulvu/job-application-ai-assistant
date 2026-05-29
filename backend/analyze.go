@@ -123,6 +123,9 @@ Rules:
 - risk_level must be one of: low, medium, high.
 - matched_points, missing_points, and resume_suggestions must be JSON arrays of strings.
 - message_draft should be a concise Chinese outreach message for applying to this role.
+- message_draft must use the candidate name from the resume profile exactly when name is not empty.
+- Do not invent placeholder candidate names such as "王某某".
+- If the candidate name is empty, do not mention a candidate name; start with "您好，我想投递..." or an equivalent polite sentence.
 
 Candidate resume profile:
 - name: %s
