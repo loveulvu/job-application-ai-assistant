@@ -2,17 +2,47 @@
 
 import { useEffect, useState } from "react";
 
-const statusOptions = ["待投递", "已投递", "已沟通", "面试", "拒绝"];
+const labels = {
+  home: "\u9996\u9875",
+  keywords: "\u5173\u952e\u8bcd\u7edf\u8ba1",
+  title: "\u6295\u9012\u5206\u6790\u8bb0\u5f55",
+  intro: "\u67e5\u770b \u0041\u0049 \u5206\u6790\u7ed3\u679c\uff0c\u8ddf\u8e2a\u6295\u9012\u72b6\u6001\u3002",
+  loading: "\u52a0\u8f7d\u4e2d",
+  loaded: "\u5df2\u52a0\u8f7d",
+  failed: "\u52a0\u8f7d\u5931\u8d25",
+  noRecords: "\u6682\u65e0\u8bb0\u5f55\u3002\u5148\u5728 BOSS \u9875\u9762\u7528\u811a\u672c\u5206\u6790\u4e00\u4e2a\u5c97\u4f4d\u3002",
+  unknownCompany: "\u672a\u77e5\u516c\u53f8",
+  unknownPosition: "\u672a\u77e5\u5c97\u4f4d",
+  chooseRecord: "\u9009\u62e9\u4e00\u6761\u8bb0\u5f55\u67e5\u770b\u8be6\u60c5\u3002",
+  status: "\u72b6\u6001",
+  risk: "\u98ce\u9669\u7b49\u7ea7",
+  createdAt: "\u521b\u5efa\u65f6\u95f4",
+  updatedAt: "\u66f4\u65b0\u65f6\u95f4",
+  matched: "\u5339\u914d\u70b9",
+  missing: "\u7f3a\u5931\u70b9",
+  suggestions: "\u7b80\u5386\u4f18\u5316\u5efa\u8bae",
+  message: "\u6c9f\u901a\u8bed",
+  jdText: "\u004a\u0044 \u6587\u672c",
+  techKeywords: "\u6280\u672f\u5173\u952e\u8bcd",
+};
+
+const statusOptions = [
+  "\u5f85\u6295\u9012",
+  "\u5df2\u6295\u9012",
+  "\u5df2\u6c9f\u901a",
+  "\u9762\u8bd5",
+  "\u62d2\u7edd",
+];
 const riskLabels = {
-  low: "低",
-  medium: "中",
-  high: "高",
+  low: "\u4f4e",
+  medium: "\u4e2d",
+  high: "\u9ad8",
 };
 
 export default function ApplicationsPage() {
   const [items, setItems] = useState([]);
   const [selected, setSelected] = useState(null);
-  const [status, setStatus] = useState("加载中");
+  const [status, setStatus] = useState(labels.loading);
   const [error, setError] = useState("");
   const [updating, setUpdating] = useState(false);
 
@@ -21,24 +51,24 @@ export default function ApplicationsPage() {
   }, []);
 
   async function loadApplications() {
-    setStatus("加载中");
+    setStatus(labels.loading);
     setError("");
 
     try {
       const response = await fetch("/api/applications?limit=50", { cache: "no-store" });
       const data = await response.json();
       if (!response.ok) {
-        throw new Error(data.error || "读取投递记录失败");
+        throw new Error(data.error || "\u8bfb\u53d6\u6295\u9012\u8bb0\u5f55\u5931\u8d25");
       }
 
       setItems(data.items || []);
-      setStatus(`已加载 ${data.count || 0} 条`);
+      setStatus(`${labels.loaded} ${data.count || 0} \u6761`);
       if ((data.items || []).length > 0) {
         loadApplicationDetail(data.items[0].id);
       }
     } catch (err) {
       setError(err.message);
-      setStatus("加载失败");
+      setStatus(labels.failed);
     }
   }
 
@@ -49,7 +79,7 @@ export default function ApplicationsPage() {
       const response = await fetch(`/api/applications/${id}`, { cache: "no-store" });
       const data = await response.json();
       if (!response.ok) {
-        throw new Error(data.error || "读取详情失败");
+        throw new Error(data.error || "\u8bfb\u53d6\u8be6\u60c5\u5931\u8d25");
       }
       setSelected(data);
     } catch (err) {
@@ -75,7 +105,7 @@ export default function ApplicationsPage() {
       });
       const data = await response.json();
       if (!response.ok) {
-        throw new Error(data.error || "修改状态失败");
+        throw new Error(data.error || "\u4fee\u6539\u72b6\u6001\u5931\u8d25");
       }
 
       setSelected(data);
@@ -100,14 +130,15 @@ export default function ApplicationsPage() {
   return (
     <main className="shell wide">
       <nav className="top-nav">
-        <a href="/">首页</a>
+        <a href="/">{labels.home}</a>
         <a href="/profile">Profile</a>
+        <a href="/keywords">{labels.keywords}</a>
       </nav>
 
       <section className="page-heading">
         <p className="eyebrow">Applications</p>
-        <h1>投递分析记录</h1>
-        <p className="intro">查看 AI 分析结果，跟踪投递状态。</p>
+        <h1>{labels.title}</h1>
+        <p className="intro">{labels.intro}</p>
       </section>
 
       <div className="form-status">
@@ -116,9 +147,9 @@ export default function ApplicationsPage() {
       </div>
 
       <section className="applications-layout">
-        <div className="records-list" aria-label="投递记录列表">
+        <div className="records-list" aria-label={labels.title}>
           {items.length === 0 ? (
-            <p className="empty-text">暂无记录。先在 BOSS 页面用脚本分析一个岗位。</p>
+            <p className="empty-text">{labels.noRecords}</p>
           ) : (
             items.map((item) => (
               <button
@@ -128,8 +159,8 @@ export default function ApplicationsPage() {
                 onClick={() => loadApplicationDetail(item.id)}
               >
                 <span>
-                  <strong>{item.company || "未知公司"}</strong>
-                  <small>{item.position || "未知岗位"}</small>
+                  <strong>{item.company || labels.unknownCompany}</strong>
+                  <small>{item.position || labels.unknownPosition}</small>
                 </span>
                 <span className="score">{item.match_score}</span>
                 <span>{riskLabels[item.risk_level] || item.risk_level || "-"}</span>
@@ -150,7 +181,7 @@ function ApplicationDetail({ selected, updating, onStatusChange }) {
   if (!selected) {
     return (
       <aside className="detail-panel">
-        <p className="empty-text">选择一条记录查看详情。</p>
+        <p className="empty-text">{labels.chooseRecord}</p>
       </aside>
     );
   }
@@ -166,8 +197,8 @@ function ApplicationDetail({ selected, updating, onStatusChange }) {
       </div>
 
       <label className="status-picker">
-        状态
-        <select value={selected.status || "待投递"} onChange={(event) => onStatusChange(event.target.value)} disabled={updating}>
+        {labels.status}
+        <select value={selected.status || statusOptions[0]} onChange={(event) => onStatusChange(event.target.value)} disabled={updating}>
           {statusOptions.map((status) => (
             <option key={status} value={status}>
               {status}
@@ -177,28 +208,49 @@ function ApplicationDetail({ selected, updating, onStatusChange }) {
       </label>
 
       <dl className="detail-meta">
-        <dt>风险等级</dt>
+        <dt>{labels.risk}</dt>
         <dd>{riskLabels[selected.risk_level] || selected.risk_level || "-"}</dd>
-        <dt>创建时间</dt>
+        <dt>{labels.createdAt}</dt>
         <dd>{formatTime(selected.created_at)}</dd>
-        <dt>更新时间</dt>
+        <dt>{labels.updatedAt}</dt>
         <dd>{formatTime(selected.updated_at)}</dd>
       </dl>
 
-      <DetailList title="匹配点" values={selected.matched_points} />
-      <DetailList title="缺失点" values={selected.missing_points} />
-      <DetailList title="简历优化建议" values={selected.resume_suggestions} />
+      <KeywordTags keywords={selected.keywords} />
+      <DetailList title={labels.matched} values={selected.matched_points} />
+      <DetailList title={labels.missing} values={selected.missing_points} />
+      <DetailList title={labels.suggestions} values={selected.resume_suggestions} />
 
       <section className="message-box">
-        <h3>沟通语</h3>
+        <h3>{labels.message}</h3>
         <p>{selected.message_draft || "-"}</p>
       </section>
 
       <details className="jd-box">
-        <summary>JD 文本</summary>
+        <summary>{labels.jdText}</summary>
         <p>{selected.jd_text || "-"}</p>
       </details>
     </aside>
+  );
+}
+
+function KeywordTags({ keywords }) {
+  if (!Array.isArray(keywords) || keywords.length === 0) {
+    return null;
+  }
+
+  return (
+    <section className="keyword-section">
+      <h3>{labels.techKeywords}</h3>
+      <div className="keyword-tags">
+        {keywords.map((item) => (
+          <span key={`${item.category}-${item.keyword}`}>
+            {item.keyword}
+            <small>{item.category}</small>
+          </span>
+        ))}
+      </div>
+    </section>
   );
 }
 

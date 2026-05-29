@@ -65,6 +65,15 @@ func migrate(db *sql.DB) error {
 			created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
 			updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 		)`,
+		`CREATE TABLE IF NOT EXISTS job_keywords (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			application_id INTEGER NOT NULL,
+			keyword TEXT NOT NULL,
+			category TEXT NOT NULL,
+			created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			FOREIGN KEY(application_id) REFERENCES job_applications(id) ON DELETE CASCADE,
+			UNIQUE(application_id, keyword)
+		)`,
 		`INSERT OR IGNORE INTO resume_profiles (
 			id,
 			name,

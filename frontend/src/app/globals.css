@@ -111,7 +111,7 @@ code {
 
 .action-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 16px;
   margin-top: 56px;
 }
@@ -309,12 +309,14 @@ code {
 
 .detail-list,
 .message-box,
-.jd-box {
+.jd-box,
+.keyword-section {
   margin-top: 18px;
 }
 
 .detail-list h3,
-.message-box h3 {
+.message-box h3,
+.keyword-section h3 {
   margin-bottom: 8px;
   color: var(--muted);
   font-size: 14px;
@@ -336,6 +338,78 @@ code {
   background: #f7f7f2;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+}
+
+.keyword-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.keyword-tags span {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #edf7f4;
+  color: var(--accent-dark);
+  font-weight: 700;
+}
+
+.keyword-tags small {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.filter-bar {
+  margin-top: 28px;
+}
+
+.filter-bar label {
+  display: grid;
+  gap: 8px;
+  max-width: 320px;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.filter-bar select {
+  min-height: 42px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--foreground);
+}
+
+.stats-table {
+  margin-top: 24px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  overflow: hidden;
+}
+
+.stats-row {
+  display: grid;
+  grid-template-columns: minmax(140px, 1fr) 160px 120px;
+  gap: 12px;
+  align-items: center;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+.stats-row:last-child {
+  border-bottom: 0;
+}
+
+.stats-head {
+  background: #edf7f4;
+  color: var(--muted);
+  font-weight: 700;
 }
 
 .jd-box summary {
@@ -363,6 +437,10 @@ code {
 
   .record-row {
     grid-template-columns: minmax(0, 1fr) 52px;
+  }
+
+  .stats-row {
+    grid-template-columns: minmax(0, 1fr) 88px 72px;
   }
 
   .record-row span:nth-child(3),

@@ -34,6 +34,7 @@
     missingPoints: "\u7f3a\u5931\u70b9",
     resumeSuggestions: "\u7b80\u5386\u4f18\u5316\u5efa\u8bae",
     messageDraft: "\u6c9f\u901a\u8bed",
+    techKeywords: "\u6280\u672f\u5173\u952e\u8bcd",
     unknownCompany: "\u672a\u77e5\u516c\u53f8",
     currentPosition: "\u5f53\u524d\u5c97\u4f4d",
     backendOffline: "\u65e0\u6cd5\u8fde\u63a5\u672c\u5730\u540e\u7aef\uff0c\u8bf7\u786e\u8ba4 http://localhost:8083 \u5df2\u542f\u52a8\u3002",
@@ -109,6 +110,7 @@
       <div class="aja-list"><h3>${text.matchedPoints}</h3><ul data-field="matched_points"></ul></div>
       <div class="aja-list"><h3>${text.missingPoints}</h3><ul data-field="missing_points"></ul></div>
       <div class="aja-list"><h3>${text.resumeSuggestions}</h3><ul data-field="resume_suggestions"></ul></div>
+      <div class="aja-keywords"><h3>${text.techKeywords}</h3><div data-field="keywords"></div></div>
       <div class="aja-message">
         <h3>${text.messageDraft}</h3>
         <p data-field="message_draft">-</p>
@@ -207,6 +209,27 @@
         white-space: pre-wrap;
         overflow-wrap: anywhere;
       }
+      #ai-job-analyzer-panel .aja-keywords div {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+      #ai-job-analyzer-panel .aja-keywords span {
+        display: inline-flex;
+        gap: 5px;
+        align-items: center;
+        padding: 4px 8px;
+        border: 1px solid #d9ded4;
+        border-radius: 999px;
+        background: #edf7f4;
+        color: #115e59;
+        font-size: 12px;
+        font-weight: 700;
+      }
+      #ai-job-analyzer-panel .aja-keywords small {
+        color: #5f675f;
+        font-weight: 400;
+      }
     `;
 
     document.documentElement.appendChild(style);
@@ -238,6 +261,7 @@
     setList(panel, "matched_points", data.matched_points);
     setList(panel, "missing_points", data.missing_points);
     setList(panel, "resume_suggestions", data.resume_suggestions);
+    setKeywords(panel, data.keywords);
     setText(panel, "message_draft", data.message_draft);
 
     panel.querySelector("[data-action='analyze']").disabled = state.status === text.loading;
@@ -264,6 +288,31 @@
       const item = document.createElement("li");
       item.textContent = String(value);
       target.appendChild(item);
+    });
+  }
+
+  function setKeywords(panel, keywords) {
+    const target = panel.querySelector("[data-field='keywords']");
+    target.innerHTML = "";
+
+    if (!Array.isArray(keywords) || keywords.length === 0) {
+      const empty = document.createElement("span");
+      empty.textContent = "-";
+      target.appendChild(empty);
+      return;
+    }
+
+    keywords.forEach((item) => {
+      const tag = document.createElement("span");
+      tag.textContent = item.keyword || "-";
+
+      if (item.category) {
+        const category = document.createElement("small");
+        category.textContent = item.category;
+        tag.appendChild(category);
+      }
+
+      target.appendChild(tag);
     });
   }
 

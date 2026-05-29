@@ -4,24 +4,26 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"log"
 )
 
 const defaultApplicationStatus = "\u5f85\u6295\u9012"
 
 type jobApplicationResponse struct {
-	ID                int      `json:"id"`
-	Company           string   `json:"company"`
-	Position          string   `json:"position"`
-	JDText            string   `json:"jd_text,omitempty"`
-	MatchScore        int      `json:"match_score"`
-	RiskLevel         string   `json:"risk_level"`
-	MatchedPoints     []string `json:"matched_points"`
-	MissingPoints     []string `json:"missing_points"`
-	ResumeSuggestions []string `json:"resume_suggestions"`
-	MessageDraft      string   `json:"message_draft"`
-	Status            string   `json:"status"`
-	CreatedAt         string   `json:"created_at"`
-	UpdatedAt         string   `json:"updated_at"`
+	ID                int            `json:"id"`
+	Company           string         `json:"company"`
+	Position          string         `json:"position"`
+	JDText            string         `json:"jd_text,omitempty"`
+	MatchScore        int            `json:"match_score"`
+	RiskLevel         string         `json:"risk_level"`
+	MatchedPoints     []string       `json:"matched_points"`
+	MissingPoints     []string       `json:"missing_points"`
+	ResumeSuggestions []string       `json:"resume_suggestions"`
+	MessageDraft      string         `json:"message_draft"`
+	Status            string         `json:"status"`
+	Keywords          []keywordMatch `json:"keywords"`
+	CreatedAt         string         `json:"created_at"`
+	UpdatedAt         string         `json:"updated_at"`
 }
 
 type jobApplicationListItem struct {
@@ -91,6 +93,11 @@ func (app *application) createJobApplication(input analyzeJobRequest, analysis a
 		return jobApplicationResponse{}, err
 	}
 
+	keywords := extractKeywords(input.JDText)
+	if err := app.saveKeywordsForApplication(int(id), keywords); err != nil {
+		log.Printf("save application keywords: %v", err)
+	}
+
 	return app.getJobApplication(int(id))
 }
 
@@ -144,6 +151,14 @@ func (app *application) getJobApplication(id int) (jobApplicationResponse, error
 	}
 	if err := json.Unmarshal([]byte(resumeSuggestionsJSON), &item.ResumeSuggestions); err != nil {
 		return jobApplicationResponse{}, err
+	}
+
+	keywords, err := app.listApplicationKeywords(id)
+	if err != nil {
+		log.Printf("list application keywords: %v", err)
+		item.Keywords = []keywordMatch{}
+	} else {
+		item.Keywords = keywords
 	}
 
 	return item, nil

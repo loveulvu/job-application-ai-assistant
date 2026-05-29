@@ -38,6 +38,8 @@ func main() {
 	mux.HandleFunc("GET /api/applications", app.handleListApplications)
 	mux.HandleFunc("GET /api/applications/{id}", app.handleGetApplication)
 	mux.HandleFunc("PATCH /api/applications/{id}/status", app.handlePatchApplicationStatus)
+	mux.HandleFunc("GET /api/applications/{id}/keywords", app.handleListApplicationKeywords)
+	mux.HandleFunc("GET /api/keyword-stats", app.handleKeywordStats)
 
 	port := os.Getenv("PORT")
 	if port == "" {

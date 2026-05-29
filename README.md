@@ -2,7 +2,7 @@
 
 AI 半自动求职助手 MVP v1。
 
-用户自己登录招聘平台并打开岗位详情页，Tampermonkey 脚本读取当前页面可见岗位信息，发送到本地 Go 后端。后端结合 SQLite 中的个人 profile 调用 OpenAI-compatible API，输出结构化岗位匹配分析，并保存投递记录。第一版不自动登录、不自动批量爬取、不自动投递。
+用户自己登录招聘平台并打开岗位详情页，Tampermonkey 脚本读取当前页面可见岗位信息，发送到本地 Go 后端。后端结合 SQLite 中的个人 profile 调用 OpenAI-compatible API，输出结构化岗位匹配分析，保存投递记录，并基于固定关键词词典统计 JD 中常见技术要求。第一版不自动登录、不自动批量爬取、不自动投递。
 
 ## 技术栈
 
@@ -23,8 +23,11 @@ AI 半自动求职助手 MVP v1。
 - `GET /api/applications`
 - `GET /api/applications/{id}`
 - `PATCH /api/applications/{id}/status`
+- `GET /api/keyword-stats`
+- `GET /api/applications/{id}/keywords`
 - `/profile` profile 管理页
 - `/applications` 投递记录管理页
+- `/keywords` 岗位关键词统计页
 - BOSS 直聘页面 Tampermonkey 分析浮层
 
 明确不做：
@@ -35,6 +38,26 @@ AI 半自动求职助手 MVP v1。
 - 自动填写聊天框
 - 自动点击立即沟通、投递或发送按钮
 - Selenium
+
+## Step 6：岗位关键词统计
+
+关键词统计用于查看已分析 JD 中高频出现的技术要求，辅助判断当前实习岗位市场更常要求哪些技能，从而调整学习优先级和投递方向。
+
+第一版不使用 LLM 提取关键词，而是使用固定关键词词典 + 文本匹配 + 归一化，保证统计结果稳定、可解释。
+
+词典分类包括：
+
+- `language`
+- `backend`
+- `database`
+- `cache`
+- `middleware`
+- `devops`
+- `network`
+- `fundamentals`
+- `concurrency`
+- `system`
+- `ai`
 
 ## 环境变量
 
@@ -138,29 +161,6 @@ http://localhost:3000/profile
 
 填写姓名、目标岗位、技能、项目和简介，点击保存。技能和项目是一行一个条目。
 
-也可以用 PowerShell 验证：
-
-```powershell
-$body = @{
-  name = "王某某"
-  target_position = "Go 后端开发实习"
-  skills = @("Go", "REST API", "SQLite", "Redis", "Docker")
-  projects = @(
-    "fund-tracking：Go 后端重构，REST API，JWT，Redis 缓存",
-    "nail-salon-system：Go + SQLite 门店前台管理系统"
-  )
-  summary = "本科计算机专业在读，主要方向为 Go 后端开发。"
-} | ConvertTo-Json -Depth 5
-
-$bytes = [System.Text.Encoding]::UTF8.GetBytes($body)
-
-Invoke-RestMethod `
-  -Uri "http://localhost:8083/api/resume-profile" `
-  -Method PUT `
-  -ContentType "application/json; charset=utf-8" `
-  -Body $bytes
-```
-
 ### 2. 在 BOSS 页面分析岗位
 
 1. 保持本地 Go 后端运行。
@@ -170,18 +170,7 @@ Invoke-RestMethod `
 5. 点击「分析当前岗位」。
 6. 等待状态变为「分析完成」。
 
-浮层会展示：
-
-- 公司
-- 岗位
-- 匹配分
-- 风险等级
-- 匹配点
-- 缺失点
-- 简历优化建议
-- 沟通语
-
-点击「复制沟通语」会把沟通语复制到剪贴板。脚本不会自动填写输入框，也不会点击投递或发送按钮。
+浮层会展示公司、岗位、匹配分、风险等级、匹配点、缺失点、简历优化建议、技术关键词和沟通语。
 
 ### 3. 查看投递记录
 
@@ -191,18 +180,14 @@ Invoke-RestMethod `
 http://localhost:3000/applications
 ```
 
-页面会展示历史分析记录列表。点击某条记录后，可以查看匹配点、缺失点、简历优化建议、沟通语和 JD 文本。
+页面会展示历史分析记录列表。点击某条记录后，可以查看匹配点、缺失点、简历优化建议、技术关键词、沟通语和 JD 文本。
 
-也可以用接口验证：
+接口验证：
 
 ```powershell
 Invoke-RestMethod -Uri "http://localhost:8083/api/applications?limit=20&offset=0"
-```
-
-查看单条详情：
-
-```powershell
 Invoke-RestMethod -Uri "http://localhost:8083/api/applications/1"
+Invoke-RestMethod -Uri "http://localhost:8083/api/applications/1/keywords"
 ```
 
 ### 4. 修改投递状态
@@ -230,10 +215,21 @@ Invoke-RestMethod `
   -Body $bytes
 ```
 
-确认数据库记录：
+### 5. 查看关键词统计
+
+打开：
+
+```text
+http://localhost:3000/keywords
+```
+
+页面会展示关键词、分类和出现次数，并支持按分类筛选。
+
+接口验证：
 
 ```powershell
-sqlite3 .\data\app.db "select id, company, position, match_score, risk_level, status, created_at from job_applications order by id desc limit 5;"
+Invoke-RestMethod -Uri "http://localhost:8083/api/keyword-stats"
+Invoke-RestMethod -Uri "http://localhost:8083/api/keyword-stats?category=cache&limit=20"
 ```
 
 ## API 说明
@@ -250,14 +246,13 @@ sqlite3 .\data\app.db "select id, company, position, match_score, risk_level, st
 }
 ```
 
-返回：
+返回中包含 `keywords`：
 
 ```json
 {
   "id": 1,
   "company": "某公司",
   "position": "Go 后端开发实习",
-  "jd_text": "岗位 JD 文本",
   "match_score": 85,
   "risk_level": "low",
   "matched_points": [],
@@ -265,34 +260,34 @@ sqlite3 .\data\app.db "select id, company, position, match_score, risk_level, st
   "resume_suggestions": [],
   "message_draft": "...",
   "status": "待投递",
+  "keywords": [
+    { "keyword": "Go", "category": "language" },
+    { "keyword": "Redis", "category": "cache" }
+  ],
   "created_at": "...",
   "updated_at": "..."
 }
 ```
 
-### GET /api/applications
+### GET /api/keyword-stats
 
 支持查询参数：
 
-- `limit`：默认 20，最大 100
-- `offset`：默认 0
+- `limit`：默认 50，最大 100
+- `category`：可选，按分类过滤
 
 返回：
 
 ```json
 {
-  "items": [],
-  "count": 0
-}
-```
-
-### PATCH /api/applications/{id}/status
-
-请求：
-
-```json
-{
-  "status": "已投递"
+  "items": [
+    {
+      "keyword": "Redis",
+      "category": "cache",
+      "count": 12
+    }
+  ],
+  "count": 1
 }
 ```
 
@@ -313,7 +308,7 @@ sqlite3 .\data\app.db "select id, company, position, match_score, risk_level, st
 
 一句话项目描述：
 
-基于 Go + Next.js + SQLite + Tampermonkey + OpenAI-compatible API 实现 AI 半自动求职助手，支持从 BOSS 岗位页面提取 JD，结合个人 profile 调用大模型进行结构化匹配分析，并管理投递记录与状态。
+基于 Go + Next.js + SQLite + Tampermonkey + OpenAI-compatible API 实现 AI 半自动求职助手，支持从 BOSS 岗位页面提取 JD，结合个人 profile 调用大模型进行结构化匹配分析，并管理投递记录、状态和岗位技术关键词统计。
 
 技术栈：
 
@@ -321,15 +316,9 @@ Go `net/http`、SQLite、Next.js、Tampermonkey、OpenAI-compatible API。
 
 核心亮点：
 
-- 设计 Go 后端 API，完成 profile 管理、岗位分析、投递记录查询和状态流转。
-- 使用 SQLite 持久化个人 profile、AI 分析结果、沟通语和投递状态。
+- 设计 Go 后端 API，完成 profile 管理、岗位分析、投递记录查询、状态流转和关键词统计。
+- 使用 SQLite 持久化个人 profile、AI 分析结果、沟通语、投递状态和岗位关键词。
 - 接入 OpenAI-compatible API，约束模型输出合法 JSON，解析匹配分、风险等级、技能缺口、简历优化建议和沟通语。
 - 编写 Tampermonkey 脚本读取当前 BOSS 岗位页可见文本，通过本地后端完成分析并在页面浮层展示结果。
+- 使用固定关键词词典对 JD 做稳定匹配与归一化，不依赖 LLM 提取关键词，便于统计实习岗位技能需求。
 - 明确安全边界：不保存 API Key、不自动登录、不自动投递、不批量爬取。
-
-可讲述的实现点：
-
-- 后端统一返回 `application/json; charset=utf-8`，PowerShell 中文请求使用 UTF-8 bytes，避免中文写入变成 `???`。
-- 前端使用 Next.js rewrite 代理 `/api/*` 到本地 Go 后端，减少浏览器跨域问题。
-- 投递状态固定枚举为「待投递、已投递、已沟通、面试、拒绝」，非法状态返回 400。
-- Tampermonkey 脚本只分析当前页面，提取失败时使用 `document.body.innerText` 截断兜底，避免扩大为爬虫。
